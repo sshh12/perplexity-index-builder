@@ -131,8 +131,12 @@ class IndexBuilder:
         except Exception as e:
             raise ValueError(f"Error evaluating expression '{expression}': {e}")
     
-    def build_index(self, score_expr: str, top_k: int = 10) -> List[Tuple[str, float, Dict]]:
-        """Build index by evaluating score expression and ranking tickers."""
+    def build_index(self, score_expr: str, top_k: int = 10) -> Tuple[List[Tuple[str, float, Dict]], List[Tuple[str, float, Dict]]]:
+        """Build index by evaluating score expression and ranking tickers.
+        
+        Returns:
+            Tuple of (top_k_tickers, all_scored_tickers)
+        """
         # Extract required variables from expression
         required_vars = self.extract_variables_from_expression(score_expr)
         self.set_required_variables(required_vars)
@@ -149,7 +153,71 @@ class IndexBuilder:
         
         # Sort by score (descending) and take top K
         scored_tickers.sort(key=lambda x: x[1], reverse=True)
-        return scored_tickers[:top_k]
+        return scored_tickers[:top_k], scored_tickers
+    
+    def calculate_percentile(self, sorted_values: List[float], percentile: float) -> float:
+        """Calculate percentile from sorted list of values."""
+        if not sorted_values:
+            return 0.0
+        
+        n = len(sorted_values)
+        index = (percentile / 100.0) * (n - 1)
+        
+        if index.is_integer():
+            return sorted_values[int(index)]
+        else:
+            lower_index = int(index)
+            upper_index = min(lower_index + 1, n - 1)
+            weight = index - lower_index
+            return sorted_values[lower_index] * (1 - weight) + sorted_values[upper_index] * weight
+    
+    def calculate_dataset_statistics(self, all_scored_tickers: List[Tuple[str, float, Dict]]) -> Dict[str, Dict[str, float]]:
+        """Calculate comprehensive statistics for all score dimensions and the final score."""
+        if not all_scored_tickers:
+            return {}
+        
+        # Get all score keys
+        all_score_keys = set()
+        for _, _, scores in all_scored_tickers:
+            all_score_keys.update(scores.keys())
+        score_keys = sorted(list(all_score_keys))
+        
+        statistics = {}
+        
+        # Statistics for individual score dimensions
+        for key in score_keys:
+            values = []
+            for _, _, scores in all_scored_tickers:
+                if key in scores:
+                    values.append(scores[key])
+            
+            if values:
+                sorted_values = sorted(values)
+                statistics[key] = {
+                    'count': len(values),
+                    'min': sorted_values[0],
+                    'max': sorted_values[-1],
+                    'mean': sum(values) / len(values),
+                    'p25': self.calculate_percentile(sorted_values, 25),
+                    'p50': self.calculate_percentile(sorted_values, 50),  # median
+                    'p75': self.calculate_percentile(sorted_values, 75),
+                }
+        
+        # Statistics for final computed score
+        final_scores = [score for _, score, _ in all_scored_tickers]
+        if final_scores:
+            sorted_final_scores = sorted(final_scores)
+            statistics['final_score'] = {
+                'count': len(final_scores),
+                'min': sorted_final_scores[0],
+                'max': sorted_final_scores[-1],
+                'mean': sum(final_scores) / len(final_scores),
+                'p25': self.calculate_percentile(sorted_final_scores, 25),
+                'p50': self.calculate_percentile(sorted_final_scores, 50),
+                'p75': self.calculate_percentile(sorted_final_scores, 75),
+            }
+        
+        return statistics
     
     def generate_tradingview_expression(self, index_tickers: List[Tuple[str, float, Dict]], 
                                       equal_weight: bool = True, strategy_name: str = "Custom") -> str:
@@ -268,7 +336,7 @@ if barstate.islast
         return ", ".join([ticker for ticker, _, _ in index_tickers])
     
     def create_index_report(self, index_tickers: List[Tuple[str, float, Dict]], 
-                           score_expr: str, strategy_name: str) -> str:
+                           score_expr: str, strategy_name: str, dataset_stats: Dict[str, Dict[str, float]] = None) -> str:
         """Create a comprehensive markdown report for the index."""
         
         # Get all unique score keys from the data
@@ -284,7 +352,30 @@ if barstate.islast
 **Generated:** {time.ctime()}
 **Strategy:** {strategy_name}
 **Scoring Expression:** `{score_expr}`{start_date_info}
-**Index Size:** {len(index_tickers)} stocks
+**Index Size:** {len(index_tickers)} stocks"""
+
+        # Add dataset statistics section if available
+        if dataset_stats:
+            report += "\n\n## Dataset Statistics\n"
+            report += "\n*Statistics calculated on the full dataset before applying top-k filter*\n\n"
+            
+            # Create statistics table
+            stat_headers = ["Metric", "Count", "Min", "Max", "Mean", "P25", "P50 (Median)", "P75"]
+            report += "| " + " | ".join(stat_headers) + " |\n"
+            report += "|" + "|".join(["--------"] * len(stat_headers)) + "|\n"
+            
+            # Add individual score dimensions
+            for key in sorted(dataset_stats.keys()):
+                if key != 'final_score':
+                    stats = dataset_stats[key]
+                    report += f"| {key.title()} | {stats['count']} | {stats['min']:.1f} | {stats['max']:.1f} | {stats['mean']:.1f} | {stats['p25']:.1f} | {stats['p50']:.1f} | {stats['p75']:.1f} |\n"
+            
+            # Add final score statistics
+            if 'final_score' in dataset_stats:
+                stats = dataset_stats['final_score']
+                report += f"| **Final Score** | {stats['count']} | {stats['min']:.3f} | {stats['max']:.3f} | {stats['mean']:.3f} | {stats['p25']:.3f} | {stats['p50']:.3f} | {stats['p75']:.3f} |\n"
+
+        report += f"""
 
 ## Index Composition
 
@@ -426,13 +517,16 @@ def main():
     print(f"\nBuilding index with expression: {args.score_expr}")
     if args.start_date:
         print(f"Index will be normalized to 100 on: {args.start_date}")
-    index_tickers = builder.build_index(args.score_expr, args.top_k)
+    index_tickers, all_scored_tickers = builder.build_index(args.score_expr, args.top_k)
     
     if not index_tickers:
         print("Error: No tickers could be scored")
         return
     
-    print(f"Index built with {len(index_tickers)} stocks")
+    print(f"Index built with {len(index_tickers)} stocks from {len(all_scored_tickers)} total scored tickers")
+    
+    # Calculate dataset statistics
+    dataset_stats = builder.calculate_dataset_statistics(all_scored_tickers)
     
     # Determine output file
     if args.output:
@@ -443,7 +537,7 @@ def main():
     
     # Generate report
     strategy_name = Path(args.data).name
-    report = builder.create_index_report(index_tickers, args.score_expr, strategy_name)
+    report = builder.create_index_report(index_tickers, args.score_expr, strategy_name, dataset_stats)
     
     # Save report
     with open(output_file, 'w') as f:
