@@ -6,19 +6,24 @@
 
 ## Usage
 
-1. **Create a strategy** using the right format with JSON scores - define your scoring criteria and rubric in markdown (see [`strategies/ai-native.md`](https://github.com/sshh12/perplexity-index-builder/blob/main/strategies/ai-native.md))
+1. **Get a Perplexity API key** - Sign up at [Perplexity AI](https://www.perplexity.ai/) and get your API key from [API settings](https://www.perplexity.ai/settings/api). Set it as an environment variable:
+   ```bash
+   export PERPLEXITY_API_KEY="your-api-key-here"
+   ```
 
-2. **Run research script** to analyze companies and inspect outputs:
+2. **Create a strategy** using the right format with JSON scores - define your scoring criteria and rubric in markdown (see [`strategies/ai-native.md`](https://github.com/sshh12/perplexity-index-builder/blob/main/strategies/ai-native.md))
+
+3. **Run research script** to analyze companies and inspect outputs:
    ```bash
    python scripts/research.py --universe universes/nasdaq100.csv --strategy strategies/ai-native.md
    ```
 
-3. **Run index script** and play with different expressions to build your index:
+4. **Run index script** and play with different expressions to build your index:
    ```bash
    python scripts/build_index.py --data data/ai-native --score-expr '(($ai_nativeness-7) + ($ai_product_value-5)) / $pre_existing_hype' --start-date 2025-01-01 --top-k 10
    ```
 
-4. **Open TradingView** to visualize your index:
+5. **Open TradingView** to visualize your index:
    - Go to https://www.tradingview.com/
    - Open any chart 
    - Click the "Pine Editor" tab at the bottom
