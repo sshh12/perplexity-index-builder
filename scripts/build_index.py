@@ -11,9 +11,20 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Any
 
 class IndexBuilder:
-    def __init__(self, data_dir: str):
+    def __init__(self, data_dir: str, required_vars: List[str] = None):
         self.data_dir = Path(data_dir)
         self.research_data = {}
+        self.required_vars = required_vars or []
+        
+    def extract_variables_from_expression(self, expression: str) -> List[str]:
+        """Extract variable names from a scoring expression."""
+        # Find all variables in the format $variable_name
+        variables = re.findall(r'\$(\w+)', expression)
+        return list(set(variables))  # Remove duplicates
+    
+    def set_required_variables(self, variables: List[str]):
+        """Set the required variables for score extraction."""
+        self.required_vars = variables
         
     def load_research_data(self) -> Dict[str, Dict]:
         """Load and parse all research markdown files."""
@@ -57,43 +68,48 @@ class IndexBuilder:
         for match in matches:
             try:
                 scores = json.loads(match)
-                # Validate expected fields
-                if all(key in scores for key in ['nativeness', 'hype']):
-                    return {
-                        'nativeness': float(scores['nativeness']),
-                        'hype': float(scores['hype']),
-                        'confidence': float(scores.get('confidence', 5.0))
-                    }
+                # Validate required fields
+                if self.required_vars and all(key in scores for key in self.required_vars):
+                    result = {}
+                    for var in self.required_vars:
+                        result[var] = float(scores[var])
+                    return result
+                elif not self.required_vars:
+                    # If no required vars specified, return all numeric scores
+                    result = {}
+                    for key, value in scores.items():
+                        try:
+                            result[key] = float(value)
+                        except (ValueError, TypeError):
+                            pass
+                    if result:
+                        return result
             except (json.JSONDecodeError, ValueError, KeyError) as e:
                 continue
         
-        # Fallback: try to find score patterns in text
-        score_patterns = {
-            'nativeness': [
-                r'(?:nativeness|ai.nativeness)[:\s]+(\d+(?:\.\d+)?)',
-                r'"nativeness"[:\s]+(\d+(?:\.\d+)?)',
-                r'AI\s+Nativeness[:\s]+(\d+(?:\.\d+)?)'
-            ],
-            'hype': [
-                r'(?:hype|market.hype)[:\s]+(\d+(?:\.\d+)?)',
-                r'"hype"[:\s]+(\d+(?:\.\d+)?)',
-                r'Market\s+Hype[:\s]+(\d+(?:\.\d+)?)'
-            ]
-        }
-        
+        # Fallback: try to find score patterns in text using required variables
+        if not self.required_vars:
+            return {}
+            
+        # Generate dynamic patterns for required variables
         extracted_scores = {}
-        for score_type, patterns in score_patterns.items():
+        for var in self.required_vars:
+            patterns = [
+                rf'(?:{var}|{var.lower()}|{var.upper()})[:\s]+(\d+(?:\.\d+)?)',
+                rf'"{var}"[:\s]+(\d+(?:\.\d+)?)',
+                rf'{var.title()}[:\s]+(\d+(?:\.\d+)?)'
+            ]
+            
             for pattern in patterns:
                 match = re.search(pattern, content, re.IGNORECASE)
                 if match:
                     try:
-                        extracted_scores[score_type] = float(match.group(1))
+                        extracted_scores[var] = float(match.group(1))
                         break
                     except ValueError:
                         continue
         
-        if 'nativeness' in extracted_scores and 'hype' in extracted_scores:
-            extracted_scores['confidence'] = 3.0  # Lower confidence for extracted scores
+        if len(extracted_scores) == len(self.required_vars):
             return extracted_scores
         
         return {}
@@ -116,6 +132,11 @@ class IndexBuilder:
     
     def build_index(self, score_expr: str, top_k: int = 10) -> List[Tuple[str, float, Dict]]:
         """Build index by evaluating score expression and ranking tickers."""
+        # Extract required variables from expression
+        required_vars = self.extract_variables_from_expression(score_expr)
+        self.set_required_variables(required_vars)
+        print(f"Expression requires variables: {required_vars}")
+        
         scored_tickers = []
         
         for ticker, data in self.research_data.items():
@@ -171,6 +192,12 @@ plot(index_value, title="AI-Native Index", color=color.blue, linewidth=2)
                            score_expr: str, strategy_name: str) -> str:
         """Create a comprehensive markdown report for the index."""
         
+        # Get all unique score keys from the data
+        all_score_keys = set()
+        for _, _, scores in index_tickers:
+            all_score_keys.update(scores.keys())
+        score_keys = sorted(list(all_score_keys))
+        
         report = f"""# {strategy_name.title()} Index Report
 
 **Generated:** {time.ctime()}
@@ -180,21 +207,42 @@ plot(index_value, title="AI-Native Index", color=color.blue, linewidth=2)
 
 ## Index Composition
 
-| Rank | Ticker | Score | AI Nativeness | Market Hype | Confidence |
-|------|--------|-------|---------------|-------------|------------|
-"""
+| Rank | Ticker | Score |"""
         
+        # Add dynamic column headers
+        for key in score_keys:
+            report += f" {key.title()} |"
+        report += "\n"
+        
+        # Add separator row
+        report += "|------|--------|-------|"
+        for _ in score_keys:
+            report += "-------------|"
+        report += "\n"
+        
+        # Add data rows
         for i, (ticker, score, scores) in enumerate(index_tickers, 1):
-            report += f"| {i} | {ticker} | {score:.3f} | {scores['nativeness']:.1f} | {scores['hype']:.1f} | {scores['confidence']:.1f} |\n"
+            report += f"| {i} | {ticker} | {score:.3f} |"
+            for key in score_keys:
+                value = scores.get(key, 0.0)
+                report += f" {value:.1f} |"
+            report += "\n"
+        
+        # Calculate averages
+        avg_score = sum(score for _, score, _ in index_tickers) / len(index_tickers)
         
         report += f"""
 
 ## Index Statistics
 
-- **Average Score:** {sum(score for _, score, _ in index_tickers) / len(index_tickers):.3f}
-- **Average AI Nativeness:** {sum(scores['nativeness'] for _, _, scores in index_tickers) / len(index_tickers):.1f}
-- **Average Market Hype:** {sum(scores['hype'] for _, _, scores in index_tickers) / len(index_tickers):.1f}
-- **Average Confidence:** {sum(scores['confidence'] for _, _, scores in index_tickers) / len(index_tickers):.1f}
+- **Average Score:** {avg_score:.3f}"""
+        
+        # Add dynamic average statistics
+        for key in score_keys:
+            avg_value = sum(scores.get(key, 0.0) for _, _, scores in index_tickers) / len(index_tickers)
+            report += f"\n- **Average {key.title()}:** {avg_value:.1f}"
+        
+        report += f"""
 
 ## TradingView Integration
 
@@ -218,26 +266,28 @@ plot(index_value, title="AI-Native Index", color=color.blue, linewidth=2)
 This index was constructed by:
 
 1. **Research Phase:** Deep analysis of each company using Perplexity AI's search capabilities
-2. **Scoring:** Each company rated on AI Nativeness (1-10) and Market Hype (1-10)
+2. **Scoring:** Each company rated on multiple dimensions
 3. **Index Construction:** Companies ranked using the expression: `{score_expr}`
 4. **Selection:** Top {len(index_tickers)} companies selected for the index
 
 ### Scoring Framework
-
-- **AI Nativeness (1-10):** How fundamentally AI-driven is the company's business model
-- **Market Hype (1-10):** How much of the current valuation is driven by AI hype vs fundamentals
-- **Confidence (1-10):** Analyst confidence in the assessment
+"""
+        
+        # Add dynamic scoring framework description
+        for key in score_keys:
+            report += f"\n- **{key.title()}:** Scoring dimension for {key}"
+        
+        report += f"""
 
 ### Index Expression: `{score_expr}`
 
-This expression was designed to identify companies that are genuinely AI-native while being mindful of valuation bubbles.
+This expression combines multiple scoring dimensions to rank companies effectively.
 
 ## Risk Considerations
 
-- High concentration in technology sector
-- Sensitivity to AI market sentiment
-- Potential for increased volatility during tech corrections
 - Strategy based on current market conditions and may need periodic rebalancing
+- Index composition may be concentrated in specific sectors
+- Results depend on the quality and recency of research data
 
 ---
 
@@ -295,7 +345,12 @@ def main():
     # Print summary
     print(f"\nTop {len(index_tickers)} stocks in {strategy_name} index:")
     for i, (ticker, score, scores) in enumerate(index_tickers, 1):
-        print(f"{i:2d}. {ticker:<6} Score: {score:6.3f} (AI: {scores['nativeness']:.1f}, Hype: {scores['hype']:.1f})")
+        # Build dynamic score display
+        score_parts = []
+        for key, value in scores.items():
+            score_parts.append(f"{key.title()}: {value:.1f}")
+        score_display = ", ".join(score_parts) if score_parts else "No scores"
+        print(f"{i:2d}. {ticker:<6} Score: {score:6.3f} ({score_display})")
 
 if __name__ == "__main__":
     main() 

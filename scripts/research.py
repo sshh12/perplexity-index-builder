@@ -47,7 +47,7 @@ class PerplexityResearcher:
             "messages": [
                 {
                     "role": "system",
-                    "content": "You are a sophisticated financial analyst with access to current market data and company information."
+                    "content": "You are a sophisticated financial analyst with access to current market data and company information. You always perform extremely thorough research and analysis of the company BEFORE providing final JSON object containing your scores. You must explain your conclusions before providing the JSON object. Any scores should be provided AFTER analysis sections and not before."
                 },
                 {
                     "role": "user", 
@@ -56,7 +56,10 @@ class PerplexityResearcher:
             ],
             "return_related_questions": False,
             "return_images": False,
-            "search_recency_filter": "year"
+            "search_recency_filter": "year",
+            "web_search_options": {
+                "search_context_size": "medium"
+            }
         }
         
         try:
