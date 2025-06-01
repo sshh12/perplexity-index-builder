@@ -40,7 +40,6 @@
 **Generated:** Sat May 31 23:00:12 2025
 **Strategy:** ai-native
 **Scoring Expression:** `(($ai_nativeness-7) + ($ai_product_value-5)) / $pre_existing_hype`
-**Index Start Date:** 2025-05-30 (normalized to 100)
 **Index Size:** 10 stocks
 
 ## Dataset Statistics
@@ -275,6 +274,258 @@ This expression combines multiple scoring dimensions to rank companies effective
 - Index composition may be concentrated in specific sectors
 - Results depend on the quality and recency of research data
 - Index performance is relative to 2025-05-30 baseline
+
+---
+
+*This index is for informational purposes only and should not be considered investment advice.*
+
+</details>
+
+<details>
+<summary>Recession-Resilient Moats Index (Click to expand)</summary>
+
+# Recession-Resilient-Moats Index Report
+
+**Generated:** Sun Jun  1 01:54:09 2025
+**Strategy:** recession-resilient-moats
+**Scoring Expression:** `($recession_history * 2 + $debt_burden * 1.5 + $pricing_power + $cyclicality)`
+**Index Size:** 10 stocks
+
+## Dataset Statistics
+
+*Statistics calculated on the full dataset before applying top-k filter*
+
+| Metric | Count | Min | Max | Mean | P25 | P50 (Median) | P75 |
+|--------|--------|--------|--------|--------|--------|--------|--------|
+| Cyclicality | 253 | 2.0 | 10.0 | 6.9 | 6.0 | 7.0 | 8.0 |
+| Debt_Burden | 253 | 2.0 | 10.0 | 7.0 | 6.0 | 8.0 | 9.0 |
+| Pricing_Power | 253 | 2.0 | 9.0 | 7.1 | 7.0 | 7.0 | 8.0 |
+| Recession_History | 253 | 3.0 | 9.0 | 7.0 | 6.0 | 7.0 | 8.0 |
+| **Final Score** | 253 | 18.500 | 51.000 | 38.559 | 35.500 | 39.000 | 43.500 |
+
+
+## Index Composition
+
+| Rank | Ticker | Score | Cyclicality | Debt_Burden | Pricing_Power | Recession_History |
+|------|--------|-------|-------------|-------------|-------------|-------------|
+| 1 | MSFT | 51.000 | 9.0 | 10.0 | 9.0 | 9.0 |
+| 2 | CME | 50.000 | 9.0 | 10.0 | 8.0 | 9.0 |
+| 3 | ADP | 48.500 | 9.0 | 9.0 | 8.0 | 9.0 |
+| 4 | VRTX | 48.500 | 9.0 | 9.0 | 8.0 | 9.0 |
+| 5 | ABT | 48.500 | 9.0 | 9.0 | 8.0 | 9.0 |
+| 6 | RMD | 48.000 | 9.0 | 10.0 | 8.0 | 8.0 |
+| 7 | SNPS | 48.000 | 8.0 | 10.0 | 9.0 | 8.0 |
+| 8 | V | 48.000 | 8.0 | 10.0 | 9.0 | 8.0 |
+| 9 | FTNT | 48.000 | 9.0 | 10.0 | 8.0 | 8.0 |
+| 10 | PAYX | 48.000 | 9.0 | 10.0 | 8.0 | 8.0 |
+
+
+## Index Statistics
+
+- **Average Score:** 48.650
+- **Average Cyclicality:** 8.8
+- **Average Debt_Burden:** 9.7
+- **Average Pricing_Power:** 8.3
+- **Average Recession_History:** 8.5
+
+**Index Normalization:** This index is normalized to 100 on 2025-01-01. All values represent the relative performance since that date.
+
+## TradingView Integration
+
+### Simple Ticker List
+```
+MSFT, CME, ADP, VRTX, ABT, RMD, SNPS, V, FTNT, PAYX
+```
+
+### Equal Weight Pine Script
+```pinescript
+//@version=5
+indicator("Equal Weight Recession-Resilient-Moats Index", shorttitle="RECESS-IDX", overlay=false)
+
+// Index start date: 2025-05-30
+start_date = timestamp("2025-05-30")
+
+// Weights
+w0 = 0.100000
+w1 = 0.100000
+w2 = 0.100000
+w3 = 0.100000
+w4 = 0.100000
+w5 = 0.100000
+w6 = 0.100000
+w7 = 0.100000
+w8 = 0.100000
+w9 = 0.100000
+
+// Stock prices
+p0 = request.security('MSFT', timeframe.period, close)
+p1 = request.security('CME', timeframe.period, close)
+p2 = request.security('ADP', timeframe.period, close)
+p3 = request.security('VRTX', timeframe.period, close)
+p4 = request.security('ABT', timeframe.period, close)
+p5 = request.security('RMD', timeframe.period, close)
+p6 = request.security('SNPS', timeframe.period, close)
+p7 = request.security('V', timeframe.period, close)
+p8 = request.security('FTNT', timeframe.period, close)
+p9 = request.security('PAYX', timeframe.period, close)
+
+// Baseline values (prices on start date)
+var float base0 = na
+var float base1 = na
+var float base2 = na
+var float base3 = na
+var float base4 = na
+var float base5 = na
+var float base6 = na
+var float base7 = na
+var float base8 = na
+var float base9 = na
+
+// Set baseline values on or after start date
+if barstate.isconfirmed
+    if time >= start_date and na(base0)
+        base0 := p0
+    if time >= start_date and na(base1)
+        base1 := p1
+    if time >= start_date and na(base2)
+        base2 := p2
+    if time >= start_date and na(base3)
+        base3 := p3
+    if time >= start_date and na(base4)
+        base4 := p4
+    if time >= start_date and na(base5)
+        base5 := p5
+    if time >= start_date and na(base6)
+        base6 := p6
+    if time >= start_date and na(base7)
+        base7 := p7
+    if time >= start_date and na(base8)
+        base8 := p8
+    if time >= start_date and na(base9)
+        base9 := p9
+
+// Calculate normalized index value
+// Each stock normalized to its start date price, then weighted
+valid_bases = not na(base0) and not na(base1) and not na(base2) and not na(base3) and not na(base4) and not na(base5) and not na(base6) and not na(base7) and not na(base8) and not na(base9)
+index_value = valid_bases ? 100 * (w0 * (p0 / base0) + w1 * (p1 / base1) + w2 * (p2 / base2) + w3 * (p3 / base3) + w4 * (p4 / base4) + w5 * (p5 / base5) + w6 * (p6 / base6) + w7 * (p7 / base7) + w8 * (p8 / base8) + w9 * (p9 / base9)) : na
+
+plot(index_value, title="Equal Weight Recession-Resilient-Moats Index", color=color.blue, linewidth=2)
+hline(100, "Base Level", color=color.gray, linestyle=hline.style_dashed)
+
+// Display current index level and composition
+if barstate.islast and not na(index_value)
+    label.new(bar_index, index_value, "Index: " + str.tostring(index_value, "#.##"), 
+              style=label.style_label_left, color=color.blue, textcolor=color.white)
+```
+
+### Score-Weighted Pine Script  
+```pinescript
+//@version=5
+indicator("Score-Weighted Recession-Resilient-Moats Index", shorttitle="RECESS-IDX", overlay=false)
+
+// Index start date: 2025-01-01
+start_date = timestamp("2025-01-01")
+
+// Weights
+w0 = 0.104830
+w1 = 0.102775
+w2 = 0.099692
+w3 = 0.099692
+w4 = 0.099692
+w5 = 0.098664
+w6 = 0.098664
+w7 = 0.098664
+w8 = 0.098664
+w9 = 0.098664
+
+// Stock prices
+p0 = request.security('MSFT', timeframe.period, close)
+p1 = request.security('CME', timeframe.period, close)
+p2 = request.security('ADP', timeframe.period, close)
+p3 = request.security('VRTX', timeframe.period, close)
+p4 = request.security('ABT', timeframe.period, close)
+p5 = request.security('RMD', timeframe.period, close)
+p6 = request.security('SNPS', timeframe.period, close)
+p7 = request.security('V', timeframe.period, close)
+p8 = request.security('FTNT', timeframe.period, close)
+p9 = request.security('PAYX', timeframe.period, close)
+
+// Baseline values (prices on start date)
+var float base0 = na
+var float base1 = na
+var float base2 = na
+var float base3 = na
+var float base4 = na
+var float base5 = na
+var float base6 = na
+var float base7 = na
+var float base8 = na
+var float base9 = na
+
+// Set baseline values on or after start date
+if barstate.isconfirmed
+    if time >= start_date and na(base0)
+        base0 := p0
+    if time >= start_date and na(base1)
+        base1 := p1
+    if time >= start_date and na(base2)
+        base2 := p2
+    if time >= start_date and na(base3)
+        base3 := p3
+    if time >= start_date and na(base4)
+        base4 := p4
+    if time >= start_date and na(base5)
+        base5 := p5
+    if time >= start_date and na(base6)
+        base6 := p6
+    if time >= start_date and na(base7)
+        base7 := p7
+    if time >= start_date and na(base8)
+        base8 := p8
+    if time >= start_date and na(base9)
+        base9 := p9
+
+// Calculate normalized index value
+// Each stock normalized to its start date price, then weighted
+valid_bases = not na(base0) and not na(base1) and not na(base2) and not na(base3) and not na(base4) and not na(base5) and not na(base6) and not na(base7) and not na(base8) and not na(base9)
+index_value = valid_bases ? 100 * (w0 * (p0 / base0) + w1 * (p1 / base1) + w2 * (p2 / base2) + w3 * (p3 / base3) + w4 * (p4 / base4) + w5 * (p5 / base5) + w6 * (p6 / base6) + w7 * (p7 / base7) + w8 * (p8 / base8) + w9 * (p9 / base9)) : na
+
+plot(index_value, title="Score-Weighted Recession-Resilient-Moats Index", color=color.blue, linewidth=2)
+hline(100, "Base Level", color=color.gray, linestyle=hline.style_dashed)
+
+// Display current index level and composition
+if barstate.islast and not na(index_value)
+    label.new(bar_index, index_value, "Index: " + str.tostring(index_value, "#.##"), 
+              style=label.style_label_left, color=color.blue, textcolor=color.white)
+```
+
+## Methodology
+
+This index was constructed by:
+
+1. **Research Phase:** Deep analysis of each company using Perplexity AI's search capabilities
+2. **Scoring:** Each company rated on multiple dimensions
+3. **Index Construction:** Companies ranked using the expression: `($recession_history * 2 + $debt_burden * 1.5 + $pricing_power + $cyclicality)`
+4. **Selection:** Top 10 companies selected for the index
+5. **Normalization:** Index normalized to 100 on 2025-01-01
+
+### Scoring Framework
+
+- **Cyclicality:** Scoring dimension for cyclicality
+- **Debt_Burden:** Scoring dimension for debt_burden
+- **Pricing_Power:** Scoring dimension for pricing_power
+- **Recession_History:** Scoring dimension for recession_history
+
+### Index Expression: `($recession_history * 2 + $debt_burden * 1.5 + $pricing_power + $cyclicality)`
+
+This expression combines multiple scoring dimensions to rank companies effectively.
+
+## Risk Considerations
+
+- Strategy based on current market conditions and may need periodic rebalancing
+- Index composition may be concentrated in specific sectors
+- Results depend on the quality and recency of research data
+- Index performance is relative to 2025-01-01 baseline
 
 ---
 
